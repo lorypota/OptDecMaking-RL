@@ -217,14 +217,14 @@ hyperparams = [
 results = {}
 
 # To run different hyperparameters for testing
-run_all_hyperparam_combos(hyperparams, nEpisodes, lengthEpisode)
+#run_all_hyperparam_combos(hyperparams, nEpisodes, lengthEpisode)
 
 # Final tuned run
 nEpisodes = pow(10, 5)
 lengthEpisode = pow(10, 3)
-epsilon = 0.001
-alpha = 0.0001
-td_errors, Q = run_simulation(nEpisodes, lengthEpisode, epsilon, alpha, patience=100)
+epsilon = 0.01
+alpha = 0.01
+td_errors, Q = run_simulation(nEpisodes, lengthEpisode, epsilon, alpha, patience=200)
 final_results = {f"$\\epsilon$={epsilon}, $\\alpha$={alpha}": {"td_errors": td_errors}}
 plot_td_errors(final_results, title="Final TD Error Convergence")
 print_policies_and_q_values(Q)

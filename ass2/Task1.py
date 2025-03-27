@@ -213,18 +213,25 @@ hyperparams = [
     {"initial_epsilon": 0.01, "initial_alpha": 0.1},
     {"initial_epsilon": 0.1, "initial_alpha": 0.01},
     {"initial_epsilon": 0.01, "initial_alpha": 0.01},
+    {"initial_epsilon": 0.001, "initial_alpha": 0.01},
+    {"initial_epsilon": 0.01, "initial_alpha": 0.001},
+    {"initial_epsilon": 0.001, "initial_alpha": 0.001},
+    {"initial_epsilon": 0.00001, "initial_alpha": 0.001},
+    {"initial_epsilon": 0.001, "initial_alpha": 0.0001},
+    {"initial_epsilon": 0.00001, "initial_alpha": 0.1},
+    {"initial_epsilon": 0.1, "initial_alpha": 0.00001},
 ]
 results = {}
 
 # To run different hyperparameters for testing
-# run_all_hyperparam_combos(hyperparams, nEpisodes, lengthEpisode)
+#run_all_hyperparam_combos(hyperparams, nEpisodes, lengthEpisode)
 
 # Final tuned run
 nEpisodes = pow(10, 5)
 lengthEpisode = pow(10, 3)
-final_epsilon = 0.01
-final_alpha = 0.01
-td_errors, Q = run_simulation(nEpisodes, lengthEpisode, final_epsilon, final_alpha)
-final_results = {f"$\\epsilon$={final_epsilon}, $\\alpha$={final_alpha}": {"td_errors": td_errors}}
+epsilon = 0.001
+alpha = 0.0001
+td_errors, Q = run_simulation(nEpisodes, lengthEpisode, epsilon, alpha, patience=100)
+final_results = {f"$\\epsilon$={epsilon}, $\\alpha$={alpha}": {"td_errors": td_errors}}
 plot_td_errors(final_results, title="Final TD Error Convergence")
 print_policies_and_q_values(Q)

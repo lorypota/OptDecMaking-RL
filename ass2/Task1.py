@@ -213,18 +213,11 @@ hyperparams = [
     {"initial_epsilon": 0.01, "initial_alpha": 0.1},
     {"initial_epsilon": 0.1, "initial_alpha": 0.01},
     {"initial_epsilon": 0.01, "initial_alpha": 0.01},
-    {"initial_epsilon": 0.001, "initial_alpha": 0.01},
-    {"initial_epsilon": 0.01, "initial_alpha": 0.001},
-    {"initial_epsilon": 0.001, "initial_alpha": 0.001},
-    {"initial_epsilon": 0.00001, "initial_alpha": 0.001},
-    {"initial_epsilon": 0.001, "initial_alpha": 0.0001},
-    {"initial_epsilon": 0.00001, "initial_alpha": 0.1},
-    {"initial_epsilon": 0.1, "initial_alpha": 0.00001},
 ]
 results = {}
 
 # To run different hyperparameters for testing
-#run_all_hyperparam_combos(hyperparams, nEpisodes, lengthEpisode)
+run_all_hyperparam_combos(hyperparams, nEpisodes, lengthEpisode)
 
 # Final tuned run
 nEpisodes = pow(10, 5)

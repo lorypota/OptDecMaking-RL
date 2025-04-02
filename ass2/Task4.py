@@ -128,55 +128,70 @@ def build_model():
     return model, states
 
 def relative_value_iteration(model, states, max_iterations, tol):
+    """
+    Relative value iteration for finding the optimal policy that minimizes
+    the long-run average cost g and relative value function v:
+    - g: long-run average cost
+    - v(x): relative value function
+    """
     state_to_index = {state: idx for idx, state in enumerate(states)}
 
-    h = np.zeros(len(states)) # bias function h
+    v = np.zeros(len(states)) # relative value function
     
-    # Reference state is first state
+    # Reference state is first state (explicitly set v(N) = 0)
     ref_state = states[0]
     ref_idx = state_to_index[ref_state]
     
-    def Q_value(state, a, h_vec):
+    def Q_value(state, a, v_vec):
+        """
+        Computes the Q(x,a) where in our case R is a cost (negative reward)
+        """
         cost, transitions = model[state][a]
         
-        # If action 0 at threshold (no transitions), return cost directly
         if len(transitions) == 0:
             return cost
         
         q = cost
         for next_state, prob in transitions:
-            q += prob * h_vec[state_to_index[next_state]]
+            q += prob * v_vec[state_to_index[next_state]]
         
         return q
 
     for it in tqdm(range(max_iterations), desc="Relative Value Iteration"):
-        new_h = np.zeros(len(states))
+        new_v = np.zeros(len(states))
         
         # For each state, compute the minimal Q over actions
         for idx, state in enumerate(states):
-            q0 = Q_value(state, 0, h) if 0 in model[state] else math.inf
-            q1 = Q_value(state, 1, h) if 1 in model[state] else math.inf
-            new_h[idx] = min(q0, q1)
+            q0 = Q_value(state, 0, v) if 0 in model[state] else math.inf
+            q1 = Q_value(state, 1, v) if 1 in model[state] else math.inf
+            new_v[idx] = min(q0, q1) # min since we're minimizing costs
 
-        # Subtract baseline: enforce new_h[ref_idx] = 0 by subtracting its value from all states.
-        baseline = new_h[ref_idx]
-        new_h -= baseline
-        diff = np.max(np.abs(new_h - h))
+        # Calculate Mi and mi
+        diff_v = new_v - v
+        mi = np.min(diff_v)
+        Mi = np.max(diff_v)
         
-        h = new_h
-        g = baseline
+        # Compute g estimate using (Mi + mi)/2
+        g_estimate = (Mi + mi) / 2
         
-        if diff < tol:
-            print(f"Converged after {it+1} iterations, estimated average cost g = {g:.4f}")
+        # Subtract baseline
+        new_v -= new_v[ref_idx]
+        
+        if Mi - mi < tol * abs(mi):
+            print(f"Converged after {it+1} iterations")
+            print(f"Final bounds: mi={mi:.6f}, Mi={Mi:.6f}")
+            print(f"Estimated average cost g = {g_estimate:.4f}")
             break
+            
+        v = new_v
     else:
         print("Warning: Relative value iteration did not converge within the maximum iterations.")
     
     # Derive the optimal policy: for each state, choose the action that minimizes the Q-value.
     policy = {}
     for state in states:
-        q0 = Q_value(state, 0, h) if 0 in model[state] else math.inf
-        q1 = Q_value(state, 1, h) if 1 in model[state] else math.inf
+        q0 = Q_value(state, 0, v) if 0 in model[state] else math.inf
+        q1 = Q_value(state, 1, v) if 1 in model[state] else math.inf
 
         comp_type, s = state
         if s == xi[comp_type]:
@@ -185,13 +200,13 @@ def relative_value_iteration(model, states, max_iterations, tol):
             best_action = 0 if q0 <= q1 else 1
         policy[state] = best_action
 
-    return g, h, policy
+    return g_estimate, v, policy
 
 # Final run
 model, states = build_model()
-g, h, policy = relative_value_iteration(model, states, max_iterations=100000,  tol=1e-8)
+g, v, policy = relative_value_iteration(model, states, max_iterations=100000,  tol=1e-8)
 
-print(f"Estimated average cost g = {g:.4f}\n")
+print()
 print("Optimal Policy (0 = Do nothing, 1 = Maintenance):")
 print_optimal_policy(policy, xi)
-#print_Q_values(model, states, h)
+print_Q_values(model, states, v)

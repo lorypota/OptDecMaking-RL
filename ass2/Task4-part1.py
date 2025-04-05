@@ -21,6 +21,7 @@ def print_optimal_policy(policy, xi):
         print()
 
 def print_Q_values(model, states, h):
+    """Utility function to print Q-values"""
     state_to_index = {state: idx for idx, state in enumerate(states)}
     
     def Q_value(state, a, h_vec):

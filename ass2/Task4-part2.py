@@ -84,25 +84,21 @@ def sample_transition(state, action):
     without using the full model knowledge.
     """
     comp_type, s = state
-    
-    # Get immediate cost
+
     cost = C[comp_type][s][action]
     
-    # Handle special cases
+    # Handle special case
     if s == xi[comp_type] and action == 0:
-        # Invalid action at threshold
         return None, cost
     
     # Sample next state
-    if action == 0:  # Do nothing
-        # Sample increment from zero-inflated Poisson
+    if action == 0:  # Do nothing -> sample increment from zero-inflated Poisson
         delta_max = xi[comp_type] - s
         prob_vector = zero_inflated_prob_vector(p_zero, dist_name, (lambda_poisson,), delta_max)
         increment = np.random.choice(range(len(prob_vector)), p=prob_vector)
         next_s = min(s + increment, xi[comp_type])
         next_state = (comp_type, next_s)
-    else:  # Maintenance
-        # Reset to 0 and randomly select component type
+    else:  # Maintenance -> reset to 0 and randomly select component type
         new_comp = np.random.randint(0, len(xi))
         next_state = (new_comp, 0)
     
@@ -111,7 +107,7 @@ def sample_transition(state, action):
 def r_learning(states, max_episodes=10000, max_steps_per_episode=100, 
                alpha=0.1, beta=0.01, epsilon_start=1.0, epsilon_decay=0.999):
     """
-    R-Learning algorithm for average cost reinforcement learning.
+    R-Learning algorithm for average cost reinforcement learning
     
     Parameters:
     - states: List of all possible states
@@ -128,43 +124,35 @@ def r_learning(states, max_episodes=10000, max_steps_per_episode=100,
     - rho: The estimated average cost
     - rho_history: History of rho values for convergence analysis
     """
-    # Available actions
     actions = [0, 1]
-    
-    # Initialize Q-values
     Q = {state: {a: 0.0 for a in actions} for state in states}
-    
-    # Initialize average cost estimate
     rho = 0.0
     
-    # For tracking convergence
     rho_history = []
     policy_history = []
     
-    # Main learning loop
     for episode in tqdm(range(max_episodes), desc="R-Learning"):
-        # Current epsilon value (decaying over time)
         epsilon = max(epsilon_start * (epsilon_decay ** episode), 0.1)
         
-        # Select random initial state
+        # Select random initial state (more uniform than starting at (0, T))
+        # By selecting state spaces (on T) uniformly at random we sample more frequently from states spaces with a
+        # higher number of states (T=3 with 50 states is sampled more than half compared to both T=2 and T=1)
+        # This is by design since components with more states generally require more training to learn optimal policies
         state = random.choice(states)
         
-        # Episode loop
         for step in range(max_steps_per_episode):
             # Choose action using epsilon-greedy
             if random.random() < epsilon:
-                # Explore: random action
+                # Explore
                 action = random.choice(actions)
             else:
-                # Exploit: greedy action
-                # Force maintenance at threshold
+                # Exploit
                 comp_type, s = state
                 if s == xi[comp_type]:
                     action = 1
                 else:
                     action = min(actions, key=lambda a: Q[state][a])
-            
-            # Execute action and observe next state and cost
+
             next_state, cost = sample_transition(state, action)
             
             # If invalid transition, force maintenance
@@ -172,23 +160,15 @@ def r_learning(states, max_episodes=10000, max_steps_per_episode=100,
                 action = 1
                 next_state, cost = sample_transition(state, action)
             
-            # Get min Q-value for next state (minimize cost)
             min_q_next = min(Q[next_state].values())
-            
-            # Get min Q-value for current state
             min_q_current = min(Q[state].values())
             
-            # Update Q-value
             Q[state][action] += alpha * (cost - rho + min_q_next - Q[state][action])
-            
-            # Update average cost estimate
             rho += beta * (cost + min_q_next - min_q_current - rho)
             
-            # Track rho
             if episode % 10 == 0 and step == 0:
                 rho_history.append(rho)
             
-            # Move to next state
             state = next_state
         
         # Evaluate policy periodically

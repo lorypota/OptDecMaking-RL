@@ -151,8 +151,8 @@ def choose_action_VFA(weights, comp_type, s, epsilon):
 def run_QLearning_VFA(nEpisodes, lengthEpisode, initial_epsilon, initial_alpha, min_epsilon=0.01, decay_rate=5000, 
                    delta=1e-5, patience=None):
     
-    #* Initialize weight vector w = 0: one weight vector per component type and action.
-    #* Each weight vector is of dimension 2 corresponding to [bias, slope (s/xi[comp_type])].
+    #* Initialize weight vector w = 0: one weight vector per component type.
+    #* Each weight vector is of dimension (xi[comp_type] + 1) * 2.
     weights = []
     for comp_type in range(len(xi)):
         feature_dim = (xi[comp_type] + 1) * 2

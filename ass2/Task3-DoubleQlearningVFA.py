@@ -151,7 +151,7 @@ def run_Double_QLearning_VFA(nEpisodes, lengthEpisode, initial_epsilon, initial_
                              delta=1e-5, patience=None):
     
     #* Initialize weight vectors as 0 (one for each Q-estimator)
-    #* two sets of weight vectors for each state-action pair and for each component type.
+    #* two sets of weight vectors for each component type.
     weights1 = []
     weights2 = []
     for comp_type in range(len(xi)):
@@ -179,7 +179,7 @@ def run_Double_QLearning_VFA(nEpisodes, lengthEpisode, initial_epsilon, initial_
 
         #* Repeat (for each step of episode):
         for _ in range(lengthEpisode):
-            #* Choose A from S using  Q using e-greedy pi(s)=argmax_a{Q1(s,a)+S2(s,a)}
+            #* Choose A from S using  Q using e-greedy pi(s)=argmax_a{Q1(s,a)+Q2(s,a)}
             a = choose_action_double(weights1, weights2, comp_type, s, epsilon)
             
             #* Take action A, observe S', comp_type'

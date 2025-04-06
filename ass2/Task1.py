@@ -200,31 +200,13 @@ def run_all_hyperparam_combos(hyperparams, nEpisodes, lengthEpisode, printPolici
         for label, data in results.items():
             print_policies_and_q_values(data["Q"], label)
 
-# number and length of episodes (low for tuning)
-nEpisodes = pow(10, 3)
-lengthEpisode = pow(10, 2)
-
-# Tuning of hyperparams
-hyperparams = [
-    {"initial_epsilon": 0.3, "initial_alpha": 0.3},
-    {"initial_epsilon": 0.3, "initial_alpha": 0.1},
-    {"initial_epsilon": 0.1, "initial_alpha": 0.3},
-    {"initial_epsilon": 0.1, "initial_alpha": 0.1},
-    {"initial_epsilon": 0.01, "initial_alpha": 0.1},
-    {"initial_epsilon": 0.1, "initial_alpha": 0.01},
-    {"initial_epsilon": 0.01, "initial_alpha": 0.01},
-]
-results = {}
-
-# To run different hyperparameters for testing
-#run_all_hyperparam_combos(hyperparams, nEpisodes, lengthEpisode)
-
 # Final tuned run
 nEpisodes = pow(10, 5)
 lengthEpisode = pow(10, 3)
-epsilon = 0.01
-alpha = 0.01
-td_errors, Q = run_simulation(nEpisodes, lengthEpisode, epsilon, alpha, patience=200)
+epsilon = 0.3
+alpha = 0.1
+decay_rate = 20_000
+td_errors, Q = run_simulation(nEpisodes, lengthEpisode, epsilon, alpha, decay_rate=decay_rate, patience=200)
 final_results = {f"$\\epsilon$={epsilon}, $\\alpha$={alpha}": {"td_errors": td_errors}}
 plot_td_errors(final_results, title="Final TD Error Convergence")
 print_policies_and_q_values(Q)

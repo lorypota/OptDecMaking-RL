@@ -133,7 +133,6 @@ def r_learning(states, max_episodes=10000, max_steps_per_episode=100,
     
     for episode in tqdm(range(max_episodes), desc="R-Learning"):
         epsilon = max(epsilon_start * (epsilon_decay ** episode), 0.1)
-        beta_t = beta * (1 / (1 + 0.0001 * episode))
         
         # Select random initial state (more uniform than starting at (0, T))
         # By selecting state spaces (on T) uniformly at random we sample more frequently from states spaces with a
@@ -165,7 +164,7 @@ def r_learning(states, max_episodes=10000, max_steps_per_episode=100,
             min_q_current = min(Q[state].values())
             
             Q[state][action] += alpha * (cost - rho + min_q_next - Q[state][action])
-            rho += beta_t * (cost + min_q_next - min_q_current - rho)
+            rho += beta * (cost + min_q_next - min_q_current - rho)
             
             if episode % 10 == 0 and step == 0:
                 rho_history.append(rho)
@@ -244,8 +243,8 @@ states = build_states()
 policy_r, Q_r, rho_r, rho_history = r_learning(
     states, 
     max_episodes=50000,
-    max_steps_per_episode=1000,
-    alpha=0.05,  # Learning rate for Q-values
+    max_steps_per_episode=2000,
+    alpha=0.01,  # Learning rate for Q-values
     beta=0.01,   # Learning rate for average cost estimate
     epsilon_start=1.0,
     epsilon_decay=0.9995

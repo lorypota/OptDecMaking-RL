@@ -5,6 +5,10 @@ from tqdm import tqdm
 import matplotlib.pyplot as plt
 import random
 
+###########################
+##  Task 4 - R-learning  ##
+###########################
+
 # Utility
 np.random.seed(0)
 random.seed(0)

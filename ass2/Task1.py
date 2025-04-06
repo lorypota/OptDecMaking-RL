@@ -4,6 +4,10 @@ import matplotlib.pyplot as plt
 import scipy.stats as stats
 from tqdm import tqdm 
 
+####################################
+##  Task 1 - SARSA  (with TD(0))  ##
+####################################
+
 # Utility
 np.random.seed(0)
 

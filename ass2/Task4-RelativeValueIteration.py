@@ -3,6 +3,10 @@ import math
 import scipy.stats as stats
 from tqdm import tqdm 
 
+#########################################
+##  Task 4 - Relative Value Iteration  ##
+#########################################
+
 # Utility
 np.random.seed(0)
 

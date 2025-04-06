@@ -87,44 +87,52 @@ def zero_inflated_prob_vector(p_zero, dist_name, dist_params, s):
     
     return prob_vector
 
+
+
 def softmax(logits):
     """Compute softmax values for each set of scores in logits."""
     exp_logits = np.exp(logits - np.max(logits))
     return exp_logits / np.sum(exp_logits)
 
-def run_REINFORCE(nEpisodes, lengthEpisode, initial_lr, decay_rate=5000, patience=None):
+def run_REINFORCE(nEpisodes, lengthEpisode, initial_alpha, decay_rate=5000, patience=None):
    
     #* Initialize theta arbitrarily for each component type
     #  Each theta[comp_type] is a (2, xi+1) array: one column per state, one row per action.
     theta = tuple(np.zeros((2, x + 1)) for x in xi)
     
     episode_returns = []
-    policy_history = []
     stable_count = 0
     prev_policy = None
 
     #* for each episode {s1,a1,r2,...ST-1,aT-1,rT} ~ pi_theta do
     for i in tqdm(range(nEpisodes), desc="Episodes"):
         # Decay learning rate over episodes
-        lr = initial_lr / (1 + i / decay_rate)
+        alpha = initial_alpha / (1 + i / decay_rate)
         
         # Generate an episode trajectory: list of (comp_type, s, a, r)
         trajectory = []
         comp_type = np.random.randint(0, len(xi))
         s = 0  # starting state for the chosen component type
         
-        #* 
+        #! simulate episode
+        #* for t=1 to T-1 do:
         for _ in range(lengthEpisode):
+            # logits represent the model's preference for each action in a given state
+            # -> logits are updated after each episode with the gradient update
             logits = theta[comp_type][:, s]
+
+            # apply softmax to convert logits into probability distribution that sums to one
+            #  -> sample actions according to probabilities
             probs = softmax(logits)
             
             # At failure threshold, force maintenance but still use softmax for gradient update.
             if s == xi[comp_type]:
                 a = 1
+            # Otherwise draw an action according to the current policy pi_theta computed by softmax(logits)
             else:
                 a = np.random.choice([0, 1], p=probs)
             
-            # Simulate the environment transition.
+            #* Choose action A and observe S'
             if a == 0:
                 prob_vector = zero_inflated_prob_vector(p_zero, dist_name, (lambda_poisson,), xi[comp_type] - s)
                 increments = np.arange(len(prob_vector))
@@ -136,13 +144,16 @@ def run_REINFORCE(nEpisodes, lengthEpisode, initial_lr, decay_rate=5000, patienc
                 s_prime = 0
                 comp_type_prime = np.random.randint(0, len(xi))
             
+            #* Observe R
             r = -C[comp_type][s][a]
             trajectory.append((comp_type, s, a, r))
             
-            # Transition to next state.
+            #* Transition to next state.
             s = s_prime
             comp_type = comp_type_prime
         
+        #! update theta
+
         # Compute discounted returns G_t (backward pass).
         returns = np.zeros(len(trajectory))
         G = 0
@@ -152,30 +163,34 @@ def run_REINFORCE(nEpisodes, lengthEpisode, initial_lr, decay_rate=5000, patienc
             returns[t] = G
         episode_returns.append(returns[0])
         
-        # Compute a baseline as the mean return for this episode.
+        #* Compute a baseline as the mean return for this episode.
         baseline = np.mean(returns)
         
         # Update policy parameters using the REINFORCE update with baseline.
         for (comp_type, s, a, _), G in zip(trajectory, returns):
             logits = theta[comp_type][:, s]
             probs = softmax(logits)
-            # Compute gradient: ∇θ log π(a|s) = one_hot(a) - π(·|s)
+
+            # Compute gradient: ∇_θ log π(st,at) 
+            # (standard expression for the gradient of the log-probability under a softmax policy)
             grad_log = np.zeros_like(probs)
             grad_log[a] = 1
             grad_log -= probs
-            # Advantage: (G - baseline)
-            advantage = G - baseline
-            theta[comp_type][:, s] += lr * advantage * grad_log
 
-        # For monitoring: extract the greedy policy (argmax of logits).
+            # Advantage: v_t = G - baseline ()
+            advantage = G - baseline
+
+            #* REINFORCE UPDATE: θ <- θ + alpha ∇_θ ​log π_θ​(st​,at​)(Gt​−baseline)
+            theta[comp_type][:, s] += alpha * grad_log * advantage
+
+        # extract policy
         current_policy = []
         for comp in range(len(theta)):
             greedy_policy = np.argmax(theta[comp], axis=0)
             greedy_policy[xi[comp]] = 1  # force maintenance at threshold
             current_policy.append(greedy_policy)
-        policy_history.append(tuple(current_policy))
         
-        # Optional early stopping if the greedy policy remains unchanged.
+        # Early stopping for stable policy
         if patience is not None:
             if prev_policy is not None and all(np.array_equal(cp, pp) for cp, pp in zip(current_policy, prev_policy)):
                 stable_count += 1
@@ -186,15 +201,15 @@ def run_REINFORCE(nEpisodes, lengthEpisode, initial_lr, decay_rate=5000, patienc
                 stable_count = 0
             prev_policy = current_policy
 
-    return theta, episode_returns, policy_history
+    return theta, episode_returns
 
 
 # parameters
-nEpisodes = 10**5
-lengthEpisode = 10**3
-initial_lr = 0.05
+nEpisodes = pow(10,5)
+lengthEpisode = pow(10,3)
+initial_alpha = 0.05
 decay_rate = 10_000
 
-theta, episode_returns, policy_history = run_REINFORCE(nEpisodes, lengthEpisode, initial_lr=initial_lr, decay_rate=decay_rate, patience=200)
+theta, episode_returns = run_REINFORCE(nEpisodes, lengthEpisode, initial_alpha=initial_alpha, decay_rate=decay_rate, patience=200)
 plot_returns(episode_returns, title="Final Episode Return Convergence")
 print_policy_from_theta(theta)

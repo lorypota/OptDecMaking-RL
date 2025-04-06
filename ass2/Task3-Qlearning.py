@@ -211,6 +211,7 @@ def run_QLearning(nEpisodes, lengthEpisode, initial_epsilon, initial_alpha, min_
     
     return TD_errors, Q
 
+
 nEpisodes = pow(10, 5)
 lengthEpisode = pow(10, 3)
 initial_epsilon = 0.2

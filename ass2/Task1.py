@@ -162,8 +162,9 @@ def run_simulation(nEpisodes, lengthEpisode, initial_epsilon, initial_alpha, min
             
             # Update S and A for the next step
             s = s_prime
+            comp_type = comp_type_prime
             a = a_prime
-        
+            
         td_errors.append(max_td_error)
         
         # Early stopping based on stable policy
@@ -185,20 +186,6 @@ def run_simulation(nEpisodes, lengthEpisode, initial_epsilon, initial_alpha, min
             return td_errors, Q
     
     return td_errors, Q
-
-def run_all_hyperparam_combos(hyperparams, nEpisodes, lengthEpisode, printPolicies=False):
-    results = {}
-
-    for hp in tqdm(hyperparams, desc="Hyperparameter combination"):
-        label = f"$\\epsilon$={hp['initial_epsilon']}, $\\alpha$={hp['initial_alpha']}"
-        td_errors, Q = run_simulation(nEpisodes, lengthEpisode, hp['initial_epsilon'], hp['initial_alpha'], patience=30)
-        results[label] = {"td_errors": td_errors, "Q": Q}
-
-    plot_td_errors(results)
-
-    if printPolicies:
-        for label, data in results.items():
-            print_policies_and_q_values(data["Q"], label)
 
 # Final tuned run
 nEpisodes = pow(10, 5)

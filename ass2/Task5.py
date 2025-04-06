@@ -39,7 +39,7 @@ def print_policy_from_theta(theta):
     for comp_type in range(len(theta)):
         policy = np.argmax(theta[comp_type], axis=0)
         policy[xi[comp_type]] = 1  # force maintenance at threshold
-        print(f"Component Type {comp_type + 1} (Threshold = {xi[comp_type]}):")
+        print(f"Component Type {comp_type + 1}:")
         print(policy)
     print("\n")
 
@@ -55,7 +55,7 @@ def zero_inflated_prob_vector(p_zero, dist_name, dist_params, s):
 
     Parameters:
     - p_zero (float): Probability of zero inflation.
-    - dist_name (str): Name of the base distribution ('poisson', 'nbinom', 'binom').
+    - dist_name (str): Name of the base distribution.
     - dist_params (tuple): Parameters of the base distribution.
     - s (int): Threshold for "s or greater" category.
 
@@ -192,7 +192,9 @@ def run_REINFORCE(nEpisodes, lengthEpisode, initial_alpha, decay_rate=5000, pati
         
         # Early stopping for stable policy
         if patience is not None:
-            if prev_policy is not None and all(np.array_equal(cp, pp) for cp, pp in zip(current_policy, prev_policy)):
+            if prev_policy is not None and all(
+                np.array_equal(cp, pp) for cp, pp in zip(current_policy, prev_policy)
+            ):
                 stable_count += 1
                 if stable_count >= patience:
                     print(f"Stopped early at episode {i+1} — policy stable for {patience} episodes.")
@@ -210,6 +212,9 @@ lengthEpisode = pow(10,3)
 initial_alpha = 0.05
 decay_rate = 10_000
 
-theta, episode_returns = run_REINFORCE(nEpisodes, lengthEpisode, initial_alpha=initial_alpha, decay_rate=decay_rate, patience=200)
+theta, episode_returns = run_REINFORCE(
+    nEpisodes, lengthEpisode, initial_alpha=initial_alpha, 
+    decay_rate=decay_rate, patience=200
+)
 plot_returns(episode_returns, title="Final Episode Return Convergence")
 print_policy_from_theta(theta)

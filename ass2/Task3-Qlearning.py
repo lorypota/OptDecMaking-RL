@@ -208,9 +208,9 @@ def run_QLearning(nEpisodes, lengthEpisode, initial_epsilon, initial_alpha, min_
 
 nEpisodes = pow(10, 5)
 lengthEpisode = pow(10, 3)
-initial_epsilon = 0.3
-initial_alpha = 0.1
-decay_rate=20_000
+initial_epsilon = 0.2
+initial_alpha = 0.05
+decay_rate=10_000
 
 td_errors, Q = run_QLearning(nEpisodes, lengthEpisode, initial_epsilon=initial_epsilon, initial_alpha=initial_alpha, decay_rate=decay_rate, patience=200)
 final_results = {f"$\\epsilon$={initial_epsilon}, $\\alpha$={initial_alpha}": {"td_errors": td_errors}}

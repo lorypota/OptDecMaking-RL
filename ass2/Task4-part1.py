@@ -6,40 +6,46 @@ from tqdm import tqdm
 # Utility
 np.random.seed(0)
 
-def print_optimal_policy(policy, xi):
-    """Utility function to print policy per component type"""
-    policy_by_comp = {}
-    for (comp_type, s), a in policy.items():
-        if comp_type not in policy_by_comp:
-            policy_by_comp[comp_type] = {}
-        policy_by_comp[comp_type][s] = a
+def print_optimal_policies(policies, xi):
+    """Utility function to print policies for each component type"""
+    for comp_type, policy in enumerate(policies):
+        decisions = [policy.get((comp_type, s), None) for s in range(xi[comp_type]+1)]
         
-    for comp_type in sorted(policy_by_comp.keys()):
-        decisions = [policy_by_comp[comp_type].get(s, None) for s in range(xi[comp_type]+1)]
-        print(f"Component Type {comp_type+1} (Failure Threshold = {xi[comp_type]}):")
+        print(f"Component Type {comp_type+1}:")
         print("Action:", decisions)
         print()
 
-def print_Q_values(model, states, h):
-    """Utility function to print Q-values"""
-    state_to_index = {state: idx for idx, state in enumerate(states)}
+def print_Q_values(model, states, v_values, xi):
+    """Utility function to print Q-values organized by component type"""
+    num_comp_types = len(xi)
     
-    def Q_value(state, a, h_vec):
-        cost, transitions = model[state][a]
+    # Helper function to calculate Q-value
+    def calculate_q_value(state, action, v_vec, state_to_index, comp_type):
+        cost, transitions = model[state][action]
         if len(transitions) == 0:
             return cost
+            
         q = cost
         for next_state, prob in transitions:
-            q += prob * h_vec[state_to_index[next_state]]
+            if next_state[0] == comp_type and next_state in state_to_index:
+                q += prob * v_vec[state_to_index[next_state]]
         return q
-
-
-    print(f"{'State':<20}{'Q(0)':<15}{'Q(1)':<15}")
     
-    for state in states:
-        q0 = Q_value(state, 0, h) if 0 in model[state] else math.inf
-        q1 = Q_value(state, 1, h) if 1 in model[state] else math.inf
-        print(f"{str(state):<20}{q0:<15.4f}{q1:<15.4f}")
+    for comp_type in range(num_comp_types):
+        # Get states and create index mapping for this component type
+        comp_states = [(t, s) for t, s in states if t == comp_type]
+        state_to_index = {state: idx for idx, state in enumerate(comp_states)}
+        v = v_values[comp_type]
+        
+        print(f"\nComponent Type {comp_type+1}:")
+        print(f"{'State':<10}{'Q(0)':<15}{'Q(1)':<15}")
+        
+        for s in range(xi[comp_type] + 1):
+            state = (comp_type, s)
+            if state in state_to_index:
+                q0 = calculate_q_value(state, 0, v, state_to_index, comp_type) if 0 in model[state] else math.inf
+                q1 = calculate_q_value(state, 1, v, state_to_index, comp_type)
+                print(f"({comp_type}, {s})".ljust(10), f"{q0:<15.4f}{q1:<15.4f}")
 
 # Define MDP parameters
 xi = (15, 30, 50)
@@ -89,7 +95,7 @@ def zero_inflated_prob_vector(p_zero, dist_name, dist_params, s):
     return prob_vector
 
 def build_model():
-    model = {}  # model[(comp_type, s)] will be a dict: {a: (cost, transitions)}
+    model = {}  # model[(comp_type, s)]: {a: (cost, transitions)}
     states = []
     for comp_type in range(len(xi)):
         for s in range(xi[comp_type] + 1):
@@ -114,7 +120,7 @@ def build_model():
                             next_state = (comp_type, next_s)
                             transitions.append((next_state, p))
                     else:
-                        # At the threshold, we force maintenance;
+                        # At the threshold, force maintenance;
                         transitions = []
                 else:
                     # Action 1: state resets to 0 and component type is randomly chosen uniformly among all types.
@@ -135,79 +141,95 @@ def relative_value_iteration(model, states, max_iterations, tol):
     - g: long-run average cost
     - v(x): relative value function
     """
-    state_to_index = {state: idx for idx, state in enumerate(states)}
-
-    v = np.zeros(len(states)) # relative value function
+    results = []
     
-    # Reference state is first state (explicitly set v(N) = 0)
-    ref_state = states[0]
-    ref_idx = state_to_index[ref_state]
-    
-    def Q_value(state, a, v_vec):
-        """
-        Computes the Q(x,a) where in our case R is a cost (negative reward)
-        """
-        cost, transitions = model[state][a]
+    for comp_type in range(3):
+        comp_states = [(t, s) for t, s in states if t == comp_type]
+        state_to_index = {state: idx for idx, state in enumerate(comp_states)}
         
-        if len(transitions) == 0:
-            return cost
+        v = np.zeros(len(comp_states))  # value function for this component type
         
-        q = cost
-        for next_state, prob in transitions:
-            q += prob * v_vec[state_to_index[next_state]]
-        
-        return q
-
-    for it in tqdm(range(max_iterations), desc="Relative Value Iteration"):
-        new_v = np.zeros(len(states))
-        
-        # For each state, compute the minimal Q over actions
-        for idx, state in enumerate(states):
-            q0 = Q_value(state, 0, v) if 0 in model[state] else math.inf
-            q1 = Q_value(state, 1, v) if 1 in model[state] else math.inf
-            new_v[idx] = min(q0, q1) # min since we're minimizing costs
-
-        # Calculate Mi and mi
-        diff_v = new_v - v
-        mi = np.min(diff_v)
-        Mi = np.max(diff_v)
-        
-        # Compute g estimate using (Mi + mi)/2
-        g_estimate = (Mi + mi) / 2
-        
-        # Subtract baseline
-        new_v -= new_v[ref_idx]
-        
-        if Mi - mi < tol * abs(mi):
-            print(f"Converged after {it+1} iterations")
-            print(f"Final bounds: mi={mi:.6f}, Mi={Mi:.6f}")
-            print(f"Estimated average cost g = {g_estimate:.4f}")
-            break
+        def Q_value(state, a, v_vec):
+            """Computes the Q(x,a) for this component type"""
+            cost, transitions = model[state][a]
             
-        v = new_v
-    else:
-        print("Warning: Relative value iteration did not converge within the maximum iterations.")
+            if len(transitions) == 0:
+                return cost
+            
+            q = cost
+            for next_state, prob in transitions:
+                # If next_state is from a different component type, we need special handling
+                if next_state[0] != comp_type:
+                    # For transitions to other component types, we use 0 as the value
+                    # This approximates the interconnected nature of the model
+                    continue
+                    
+                q += prob * v_vec[state_to_index[next_state]]
+            
+            return q
+        
+        for it in tqdm(range(max_iterations), desc=f"RVI Component {comp_type+1}"):
+            new_v = np.zeros(len(comp_states))
+            
+            # Compute the minimal Q over actions for each state
+            for idx, state in enumerate(comp_states):
+                q0 = Q_value(state, 0, v) if 0 in model[state] else math.inf
+                q1 = Q_value(state, 1, v)
+                new_v[idx] = min(q0, q1)
+            
+            # Calculate Mi and mi
+            diff_v = new_v - v
+            mi = np.min(diff_v)
+            Mi = np.max(diff_v)
+            
+            # Compute g estimate
+            g_estimate = (Mi + mi) / 2
+            
+            # Normalize on (comp_type, 0)
+            ref_state = (comp_type, 0)
+            ref_idx = state_to_index[ref_state]
+            ref_val = new_v[ref_idx]
+            new_v = new_v - ref_val
+            
+            if Mi - mi < tol * abs(mi):
+                print(f"Component {comp_type+1} converged after {it+1} iterations")
+                print(f"Final bounds: mi={mi:.6f}, Mi={Mi:.6f}")
+                print(f"Estimated average cost g_{comp_type+1} = {g_estimate:.4f}")
+                break
+                
+            v = new_v
+        
+        # Derive optimal policy
+        policy = {}
+        for state in comp_states:
+            q0 = Q_value(state, 0, v) if 0 in model[state] else math.inf
+            q1 = Q_value(state, 1, v)
+            
+            comp_type, s = state
+            if s == xi[comp_type]:
+                best_action = 1
+            else:
+                best_action = 0 if q0 <= q1 else 1
+            policy[state] = best_action
+        
+        # Store results
+        results.append((g_estimate, v, policy))
     
-    # Derive the optimal policy: for each state, choose the action that minimizes the Q-value.
-    policy = {}
-    for state in states:
-        q0 = Q_value(state, 0, v) if 0 in model[state] else math.inf
-        q1 = Q_value(state, 1, v) if 1 in model[state] else math.inf
-
-        comp_type, s = state
-        if s == xi[comp_type]:
-            best_action = 1
-        else:
-            best_action = 0 if q0 <= q1 else 1
-        policy[state] = best_action
-
-    return g_estimate, v, policy
+    g_values = [r[0] for r in results]
+    v_values = [r[1] for r in results]
+    policies = [r[2] for r in results]
+    
+    return g_values, v_values, policies
 
 # Final run
 model, states = build_model()
-g, v, policy = relative_value_iteration(model, states, max_iterations=100000,  tol=1e-8)
+g_values, v_values, policies = relative_value_iteration(model, states, max_iterations=100000, tol=1e-8)
 
+print("\nLong-run average costs:")
+for comp_type in range(3):
+    print(f"* g for component type {comp_type+1} is: {g_values[comp_type]:.4f}")
 print()
-print("Optimal Policy (0 = Do nothing, 1 = Maintenance):")
-print_optimal_policy(policy, xi)
-print_Q_values(model, states, v)
+
+print_optimal_policies(policies, xi)
+
+print_Q_values(model, states, v_values, xi)

@@ -122,6 +122,7 @@ def choose_action(Q, comp_type, s, xi, epsilon):
 # Q-learning algo
 def run_QLearning(nEpisodes, lengthEpisode, initial_epsilon, initial_alpha, min_epsilon=0.01, decay_rate=5000, 
                    delta = 1e-5, patience=None):
+    
     #* Initialize Q(s, a), ∀ s ∈ S, a ∈ A(s), arbitrarily
     Q = tuple(np.zeros((2, x + 1)) for x in xi)
     

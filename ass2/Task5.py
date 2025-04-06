@@ -93,24 +93,9 @@ def softmax(logits):
     return exp_logits / np.sum(exp_logits)
 
 def run_REINFORCE(nEpisodes, lengthEpisode, initial_lr, decay_rate=5000, patience=None):
-    """
-    REINFORCE algorithm with baseline variance reduction.
-    
-    Parameters:
-      nEpisodes    : Total number of episodes.
-      lengthEpisode: Number of steps per episode.
-      initial_lr   : Initial learning rate.
-      decay_rate   : Decay rate for the learning rate.
-      patience     : (Optional) number of episodes with unchanged policy before early stopping.
-    
-    Returns:
-      theta         : Learned policy parameters.
-      episode_returns: List of returns from each episode.
-      policy_history: History of greedy policies (for monitoring).
-    """
-    
-    # Initialize policy parameters (theta) for each component type.
-    # Each theta[comp_type] is a (2, xi+1) array: one column per state, one row per action.
+   
+    #* Initialize theta arbitrarily for each component type
+    #  Each theta[comp_type] is a (2, xi+1) array: one column per state, one row per action.
     theta = tuple(np.zeros((2, x + 1)) for x in xi)
     
     episode_returns = []
@@ -118,6 +103,7 @@ def run_REINFORCE(nEpisodes, lengthEpisode, initial_lr, decay_rate=5000, patienc
     stable_count = 0
     prev_policy = None
 
+    #* for each episode {s1,a1,r2,...ST-1,aT-1,rT} ~ pi_theta do
     for i in tqdm(range(nEpisodes), desc="Episodes"):
         # Decay learning rate over episodes
         lr = initial_lr / (1 + i / decay_rate)
@@ -127,6 +113,7 @@ def run_REINFORCE(nEpisodes, lengthEpisode, initial_lr, decay_rate=5000, patienc
         comp_type = np.random.randint(0, len(xi))
         s = 0  # starting state for the chosen component type
         
+        #* 
         for _ in range(lengthEpisode):
             logits = theta[comp_type][:, s]
             probs = softmax(logits)

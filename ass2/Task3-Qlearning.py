@@ -1,12 +1,19 @@
 import numpy as np
-import math
+from tqdm import tqdm 
 import matplotlib.pyplot as plt
 import scipy.stats as stats
-from tqdm import tqdm 
+import math
 
-####################################
-##  Task 1 - SARSA  (with TD(0))  ##
-####################################
+###########################
+##  Task 3 - Q-Learning  ##
+###########################
+
+# Define MDP parameters
+actions = (0, 1)  # (0=do nothing, 1=maintenance)
+xi = (15, 30, 50) # break threshold per type of component
+S = [list(range(x + 1)) for x in xi]
+C = tuple([[0, 1]] * x + [[math.inf, 5]] for x in xi)
+gamma = 0.9  # Discount factor
 
 # Utility
 np.random.seed(0)
@@ -32,27 +39,20 @@ def print_policies_and_q_values(Q, label=None):
     Utility function to print policies and corresponding Q values (can be multiple)
     """
     if label:
-        print(f"\n===== Optimal Policy for {label} =====")
+        print(f"===== Optimal Policy for {label} =====")
     print("Optimal Policy (0 = Do nothing, 1 = Maintenance):")
     for comp_type in range(len(xi)):
         policy = np.argmax(Q[comp_type], axis=0)
         policy[xi[comp_type]] = 1  # Force maintenance at threshold
-        print(f"\nComponent Type {comp_type + 1} (Failure Threshold = {xi[comp_type]}):")
+        print(f"Component Type {comp_type + 1} (Failure Threshold = {xi[comp_type]}):")
         print(policy)
 
     print("\nQ-values for each Component Type:")
     for comp_type in range(len(xi)):
-        print(f"\nComponent Type {comp_type + 1} (Failure Threshold = {xi[comp_type]}):")
+        print(f"Component Type {comp_type + 1} (Failure Threshold = {xi[comp_type]}):")
         print(Q[comp_type])
 
-# Define MDP parameters
-actions = (0, 1)  # (0=do nothing, 1=maintenance)
-xi = (15, 30, 50) # break threshold per type of component
-S = [list(range(x + 1)) for x in xi]
-C = tuple([[0, 1]] * x + [[math.inf, 5]] for x in xi)
-gamma = 0.9  # Discount factor
-
-# Transition probabilities
+# Transition Probabilities
 p_zero = 0.5  # 50% probability of zero inflation
 dist_name = 'poisson'  # Base distribution
 lambda_poisson = 4  # Poisson mean
@@ -95,6 +95,7 @@ def zero_inflated_prob_vector(p_zero, dist_name, dist_params, s):
     
     return prob_vector
 
+# e-greedy action determination
 def choose_action(Q, comp_type, s, xi, epsilon):
     """
     Choose an action using an epsilon-greedy policy with a forced action at the threshold.
@@ -117,30 +118,41 @@ def choose_action(Q, comp_type, s, xi, epsilon):
         return np.random.randint(2)
     else:
         return np.argmax(Q[comp_type][:, s])
-
-def run_simulation(nEpisodes, lengthEpisode, initial_epsilon, initial_alpha, min_epsilon=0.01, decay_rate=5000, 
-                   delta = 1e-5, patience=None):
-    Q = tuple(np.zeros((2, x + 1)) for x in xi)
-    td_errors = []
     
+# Q-learning algo
+def run_QLearning(nEpisodes, lengthEpisode, initial_epsilon, initial_alpha, min_epsilon=0.01, decay_rate=5000, 
+                   delta = 1e-5, patience=None):
+    
+    #* Initialize Q(s, a), ∀ s ∈ S, a ∈ A(s), arbitrarily
+    Q = tuple(np.zeros((2, x + 1)) for x in xi)
+    
+
+    # Initialize other things    
+    TD_errors = []
     prev_policy = None
     stable_count = 0
-    
+
+    #* Repeat (for each episode):
     for i in tqdm(range(nEpisodes), desc="Episodes"):
+
         # Decaying learning rate
         alpha = initial_alpha / (1 + i / 1000)
         epsilon = max(min_epsilon, initial_epsilon * np.exp(-i / decay_rate))
 
-        # initialize S
+        #* Initialize S
         comp_type = np.random.randint(0, 3)
         s = S[comp_type][0]
+                
+        # init max TD error
+        max_TD_error = 0
         
-        # Choose A from S using policy derived from Q
-        a = choose_action(Q, comp_type, s, xi, epsilon)
-        
-        max_td_error = 0
-        
-        for j in range(0, lengthEpisode):
+        #* For Repeat (for each step of episode):
+        for _ in range(0, lengthEpisode):
+
+            #* Choose A from S using policy derived from Q using e-greedy
+            a = choose_action(Q, comp_type, s, xi, epsilon)
+
+            #* Take action A, observe S', comp_type'
             if a == 0:
                 prob_vector = zero_inflated_prob_vector(p_zero, dist_name, (lambda_poisson,), xi[comp_type]-s)
                 increments = np.arange(len(prob_vector))
@@ -153,29 +165,37 @@ def run_simulation(nEpisodes, lengthEpisode, initial_epsilon, initial_alpha, min
                 s_prime = 0
                 comp_type_prime = np.random.randint(0, 3)
             
+            #* Take action A, observe R
             r = -C[comp_type][s][a]
             
-            a_prime = choose_action(Q, comp_type_prime, s_prime, xi, epsilon)
+            #* Q-Learning Update:
+            #* Q(S, A) <- Q(S, A) + α[R + γ*max_a{Q(S', a)} – Q(S, A)]
+            if s_prime == xi[comp_type_prime]:
+                maxNextQ = Q[comp_type_prime][1,s_prime]
+            else:
+                maxNextQ = np.max(Q[comp_type_prime][:,s_prime])
+            TD_error = r + gamma* maxNextQ - Q[comp_type][a][s]
+            # update Q-value
+            Q[comp_type][a][s] += alpha * TD_error
 
-            # SARSA update
-            td_error = r + gamma * Q[comp_type_prime][a_prime][s_prime] - Q[comp_type][a][s]
-            Q[comp_type][a][s] += alpha * td_error
+            # update max TD error
+            if abs(alpha * TD_error) > max_TD_error:
+                max_TD_error = abs(alpha * TD_error)
             
-            if abs(alpha * td_error) > max_td_error:
-                max_td_error = abs(alpha * td_error)
-            
-            # Update S and A for the next step
+            #* S <- S'
             s = s_prime
             comp_type = comp_type_prime
-            a = a_prime
-            
-        td_errors.append(max_td_error)
+        
+        TD_errors.append(max_TD_error)
         
         # Early stopping based on stable policy
         if patience is not None:
             current_policy = tuple(np.argmax(Q[comp], axis=0) for comp in range(len(Q)))
+            # Force maintenance at the threshold, bc forcing action 1 at th in choose_action(.)
             for k, policy in enumerate(current_policy):
-                policy[xi[k]] = 1  # Force maintenance at the threshold
+                policy[xi[k]] = 1
+            
+            #
             if prev_policy is not None and all(np.array_equal(cp, pp) for cp, pp in zip(current_policy, prev_policy)):
                 stable_count += 1
                 if stable_count >= patience:
@@ -186,18 +206,19 @@ def run_simulation(nEpisodes, lengthEpisode, initial_epsilon, initial_alpha, min
                 prev_policy = current_policy
         
         # Early stopping based on TD convergence
-        if(max_td_error) < delta:
-            return td_errors, Q
+        if(max_TD_error) < delta:
+            return TD_errors, Q
     
-    return td_errors, Q
+    return TD_errors, Q
 
-# Final tuned run
+
 nEpisodes = pow(10, 5)
 lengthEpisode = pow(10, 3)
-epsilon = 0.3
-alpha = 0.1
-decay_rate = 20_000
-td_errors, Q = run_simulation(nEpisodes, lengthEpisode, epsilon, alpha, decay_rate=decay_rate, patience=200)
-final_results = {f"$\\epsilon$={epsilon}, $\\alpha$={alpha}": {"td_errors": td_errors}}
+initial_epsilon = 0.2
+initial_alpha = 0.05
+decay_rate=10_000
+
+td_errors, Q = run_QLearning(nEpisodes, lengthEpisode, initial_epsilon=initial_epsilon, initial_alpha=initial_alpha, decay_rate=decay_rate, patience=200)
+final_results = {f"$\\epsilon$={initial_epsilon}, $\\alpha$={initial_alpha}": {"td_errors": td_errors}}
 plot_td_errors(final_results, title="Final TD Error Convergence")
 print_policies_and_q_values(Q)
